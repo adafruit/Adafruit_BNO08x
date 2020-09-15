@@ -37,6 +37,9 @@
 
 #include "Adafruit_BNO08x.h"
 
+Adafruit_SPIDevice *spi_dev = NULL; ///< Pointer to SPI bus interface
+Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
+
 /**
  * @brief Construct a new Adafruit_BNO08x::Adafruit_BNO08x object
  *
@@ -76,6 +79,13 @@ bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
   if (!i2c_dev->begin()) {
     return false;
   }
+
+  i2c_HAL.open = i2chal_open;
+  i2c_HAL.close = i2chal_close;
+  i2c_HAL.read = i2chal_read;
+  i2c_HAL.write = i2chal_write;
+  i2c_HAL.getTimeUs = i2chal_getTimeUs;
+
 
   return _init(sensor_id);
 }
@@ -141,13 +151,17 @@ bool Adafruit_BNO08x::begin_SPI(int8_t cs_pin, int8_t sck_pin, int8_t miso_pin,
 bool Adafruit_BNO08x::_init(int32_t sensor_id) {
 
 
-  reset();
+  hardware_reset();
   // do any software reset or other initial setup
 
   // TODO: update for correct sensor types
-
+  sh2_open(&i2c_HAL, i2chal_callback, NULL);
   
   return true;
+}
+
+void Adafruit_BNO08x::hardware_reset(void) {
+
 }
 
 /**
@@ -155,6 +169,42 @@ bool Adafruit_BNO08x::_init(int32_t sensor_id) {
  * state
  *
  */
-void Adafruit_BNO08x::reset(void) {
+void Adafruit_BNO08x::software_reset(void) {
 
+}
+
+int i2chal_open(sh2_Hal_t *self) {
+  Serial.println("I2C HAL open");
+  return 0;
+}
+
+
+void i2chal_close(sh2_Hal_t *self) {
+  Serial.println("I2C HAL close");
+}
+
+int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t *t_us) {
+  Serial.println("I2C HAL read");
+
+  Serial.println("Read SHTP header");
+  uint8_t header[4];
+  i2c_dev->read(header, 4);
+  
+  return 0;
+}
+
+int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
+  Serial.println("I2C HAL write");
+  return 0;
+}
+
+uint32_t i2chal_getTimeUs(sh2_Hal_t *self) {
+  uint32_t t = millis() * 1000;
+  Serial.printf("I2C HAL get time: %d\n", t);
+  return t;
+}
+
+
+void i2chal_callback(void * cookie, sh2_AsyncEvent_t *pEvent) {
+  Serial.println("I2C HAL callback");
 }

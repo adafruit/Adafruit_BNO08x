@@ -22,7 +22,10 @@
 #include <Adafruit_I2CDevice.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
+#include "sh2.h"
+
 #define BNO08x_I2CADDR_DEFAULT 0x4A
+
 
 /*!
  *    @brief  Class that stores state and functions for interacting with
@@ -41,15 +44,23 @@ public:
   bool begin_SPI(int8_t cs_pin, int8_t sck_pin, int8_t miso_pin,
                  int8_t mosi_pin, int32_t sensor_id = 0);
   
-  void reset(void);
+  void software_reset(void);
+  void hardware_reset(void);
 
 
 protected:
   virtual bool _init(int32_t sensor_id);
 
-  Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
-  Adafruit_SPIDevice *spi_dev = NULL; ///< Pointer to SPI bus interface
+
+  sh2_Hal_t i2c_HAL;
 };
 
+
+uint32_t i2chal_getTimeUs(sh2_Hal_t *self);
+int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
+int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t *t_us);
+void i2chal_close(sh2_Hal_t *self);
+int i2chal_open(sh2_Hal_t *self);
+void i2chal_callback(void * cookie, sh2_AsyncEvent_t *pEvent);
 
 #endif

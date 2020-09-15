@@ -27,6 +27,10 @@
 #ifndef SH2_H
 #define SH2_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -683,5 +687,9 @@ int sh2_finishCal(sh2_CalStatus_t *status);
  * @return SH2_OK (0), on success.  Negative value from sh2_err.h on error.
  */
 int sh2_setIZro(sh2_IZroMotionIntent_t intent);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif
