@@ -1,0 +1,11 @@
+This software is licensed from Hillcrest Laboratories, Inc.
+Copyright (c) Hillcrest Laboratories, Inc. and its licensors. 
+All rights reserved.  
+
+Hillcrest Laboratories and the Hillcrest logo are trademarks of 
+Hillcrest Laboratories, Inc.
+
+You can contact Hillcrest Laboratories on the web at 
+http://hillcrestlabs.com/company/contact-us/ or at Hillcrest Laboratories, 
+15245 Shady Grove Road, Suite 400, Rockville, MD 20850 USA
+
