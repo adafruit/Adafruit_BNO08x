@@ -214,10 +214,10 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
     if (read_size > (i2c_buffer_max - 4)) {
       read_size = (i2c_buffer_max - 4);
     }
+    // if this is not the first read...
     if ((packet_size-remaining) > read_size){
-      // maybe do this _after_ the read
-      if (!i2c_dev->read(buffer, read_size)) {
-        // should we clear anything we've already copied into pBuffer?
+      // remainng didn't account for the header, so add it
+      if (!i2c_dev->read(buffer, read_size+4)) {
         return 0;
       }
     } else {
@@ -226,7 +226,7 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
         return 0;
       }
     }
-    
+
     Serial.println("buffer:");
     for (int i=0; i< (packet_size); i++){
       if (i%4 == 0){
@@ -234,11 +234,12 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
       }
       Serial.print("0x"); Serial.print(buffer[i],HEX); Serial.print(" ");
     }
+
     Serial.println("");
     // if the amount read is more than the read size..
     if ((packet_size-remaining) > read_size){
       // copy from 4 bytes after the beginning to skip the header
-      memcpy(pBuffer+(packet_size-remaining), buffer+4, read_size-4);
+      memcpy(pBuffer+(packet_size-remaining), buffer+4, read_size);
     } else {
       memcpy(pBuffer+(packet_size-remaining), buffer, read_size);
     }
