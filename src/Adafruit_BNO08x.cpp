@@ -155,9 +155,11 @@ bool Adafruit_BNO08x::_init(int32_t sensor_id) {
   // do any software reset or other initial setup
 
   // TODO: update for correct sensor types
-  sh2_open(&i2c_HAL, i2chal_callback, NULL);
-  
-  return true;
+  int success = sh2_open(&i2c_HAL, i2chal_callback, NULL);
+  if(success == 0){
+    return true;
+  }
+  return false;
 }
 
 void Adafruit_BNO08x::hardware_reset(void) {
