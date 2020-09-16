@@ -183,14 +183,80 @@ void i2chal_close(sh2_Hal_t *self) {
   Serial.println("I2C HAL close");
 }
 
-int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t *t_us) {
+int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+                uint32_t *t_us) {
   Serial.println("I2C HAL read");
 
   Serial.println("Read SHTP header");
   uint8_t header[4];
   i2c_dev->read(header, 4);
+  uint16_t packet_size = header[0];
+  packet_size |= (header[1] << 8);
+  // Unset the "continue" bit
+  packet_size &= ~0x8000;
+
+  size_t i2c_buffer_max = i2c_dev->maxBufferSize();
+  Serial.print("i2c buffer max");
+  Serial.println(i2c_buffer_max);
+  Serial.print(packet_size);
+  Serial.println(" bytes to read");
+  unsigned total_read_len = len;
+  if (packet_size > len){
+    // packet wouldn't fit
+    return 0;
+  }
+  unsigned remaining = packet_size;  
+  uint8_t buffer[packet_size];// should be read_size/i2c buffer size
+  unsigned read_size = remaining;
   
-  return 0;
+  while (remaining > 0) {
+    read_size = remaining;
+    if (read_size > (i2c_buffer_max - 4)) {
+      read_size = (i2c_buffer_max - 4);
+    }
+    if ((packet_size-remaining) > read_size){
+      // maybe do this _after_ the read
+      if (!i2c_dev->read(buffer, read_size)) {
+        // should we clear anything we've already copied into pBuffer?
+        return 0;
+      }
+    } else {
+      if (!i2c_dev->read(buffer, read_size)) {
+        // should we clear anything we've already copied into pBuffer?
+        return 0;
+      }
+    }
+    
+    Serial.println("buffer:");
+    for (int i=0; i< (packet_size); i++){
+      if (i%4 == 0){
+        Serial.print("\n["); Serial.print(i, HEX); Serial.print("] ");
+      }
+      Serial.print("0x"); Serial.print(buffer[i],HEX); Serial.print(" ");
+    }
+    Serial.println("");
+    // if the amount read is more than the read size..
+    if ((packet_size-remaining) > read_size){
+      // copy from 4 bytes after the beginning to skip the header
+      memcpy(pBuffer+(packet_size-remaining), buffer+4, read_size-4);
+    } else {
+      memcpy(pBuffer+(packet_size-remaining), buffer, read_size);
+    }
+    remaining -= read_size;
+    Serial.print("remaining:");
+    Serial.println(remaining);
+  }
+
+  // memcpy(pBuffer, buffer, packet_size);
+  Serial.println("pBuffer after reads:");
+  for (int i=0; i< (packet_size); i++){
+    if (i%4 == 0){
+      Serial.print("\n["); Serial.print(i, HEX); Serial.print("] ");
+    }
+    Serial.print("0x"); Serial.print(pBuffer[i],HEX); Serial.print(" ");
+  }
+  Serial.println("");
+  return packet_size;
 }
 
 int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
@@ -200,7 +266,7 @@ int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
 
 uint32_t i2chal_getTimeUs(sh2_Hal_t *self) {
   uint32_t t = millis() * 1000;
-  Serial.printf("I2C HAL get time: %d\n", t);
+  // Serial.printf("I2C HAL get time: %d\n", t);
   return t;
 }
 
