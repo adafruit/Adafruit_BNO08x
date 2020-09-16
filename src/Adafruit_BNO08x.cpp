@@ -189,7 +189,7 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
                 uint32_t *t_us) {
   Serial.println("I2C HAL read");
 
-  Serial.println("Read SHTP header");
+  Serial.println("Read SHTP header"); 
   uint8_t header[4];
   i2c_dev->read(header, 4);
   uint16_t packet_size = header[0];
@@ -198,67 +198,44 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
   packet_size &= ~0x8000;
 
   size_t i2c_buffer_max = i2c_dev->maxBufferSize();
-  Serial.print("i2c buffer max");
-  Serial.println(i2c_buffer_max);
-  Serial.print(packet_size);
-  Serial.println(" bytes to read");
+
   unsigned total_read_len = len;
   if (packet_size > len){
     // packet wouldn't fit
     return 0;
   }
-  unsigned remaining = packet_size;  
-  uint8_t buffer[packet_size];// should be read_size/i2c buffer size
-  unsigned read_size = remaining;
-  
-  while (remaining > 0) {
-    read_size = remaining;
-    if (read_size > (i2c_buffer_max - 4)) {
-      read_size = (i2c_buffer_max - 4);
+  // the number of non-header bytes to read
+  uint16_t data_remaining = packet_size-4;
+  uint8_t buffer[i2c_buffer_max];// should be read_size/i2c buffer size
+  uint16_t read_size;
+  size_t max_data_read_len = (i2c_buffer_max - 4);
+  uint16_t data_bytes_copied=0;
+
+  while (data_remaining > 0) {
+    read_size = data_remaining; // data + header
+    if (read_size > max_data_read_len) {
+      read_size = max_data_read_len;
     }
-    // if this is not the first read...
-    if ((packet_size-remaining) > read_size){
-      // remainng didn't account for the header, so add it
-      if (!i2c_dev->read(buffer, read_size+4)) {
-        return 0;
-      }
-    } else {
-      if (!i2c_dev->read(buffer, read_size)) {
-        // should we clear anything we've already copied into pBuffer?
-        return 0;
-      }
+    read_size += 4; // total read size = data read size +  header
+
+    if (!i2c_dev->read(buffer, read_size)) {
+      return 0;
     }
 
-    Serial.println("buffer:");
-    for (int i=0; i< (packet_size); i++){
-      if (i%4 == 0){
-        Serial.print("\n["); Serial.print(i, HEX); Serial.print("] ");
-      }
-      Serial.print("0x"); Serial.print(buffer[i],HEX); Serial.print(" ");
-    }
+    data_remaining -= (read_size-4);
 
-    Serial.println("");
-    // if the amount read is more than the read size..
-    if ((packet_size-remaining) > read_size){
-      // copy from 4 bytes after the beginning to skip the header
-      memcpy(pBuffer+(packet_size-remaining), buffer+4, read_size);
+    // if the amount of data we've read so far is more than we can read at once
+    if (((packet_size-4)-data_remaining) > max_data_read_len){
+      // this is not the first read, so copy from 4 bytes after the beginning of the local buffer to skip the header
+      memcpy(pBuffer+data_bytes_copied + 4, buffer+4, read_size-4);
     } else {
-      memcpy(pBuffer+(packet_size-remaining), buffer, read_size);
+      // this is the first read, so copy everything, including the header
+      memcpy(pBuffer, buffer, read_size);
+
     }
-    remaining -= read_size;
-    Serial.print("remaining:");
-    Serial.println(remaining);
+    data_bytes_copied = ((packet_size-4)-data_remaining);
   }
 
-  // memcpy(pBuffer, buffer, packet_size);
-  Serial.println("pBuffer after reads:");
-  for (int i=0; i< (packet_size); i++){
-    if (i%4 == 0){
-      Serial.print("\n["); Serial.print(i, HEX); Serial.print("] ");
-    }
-    Serial.print("0x"); Serial.print(pBuffer[i],HEX); Serial.print(" ");
-  }
-  Serial.println("");
   return packet_size;
 }
 
