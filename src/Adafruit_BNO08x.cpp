@@ -37,8 +37,12 @@
 
 #include "Adafruit_BNO08x.h"
 
-Adafruit_SPIDevice *spi_dev = NULL; ///< Pointer to SPI bus interface
-Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
+static Adafruit_SPIDevice *spi_dev = NULL; ///< Pointer to SPI bus interface
+static Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
+static HardwareSerial *uart_dev = NULL; 
+
+static sh2_SensorValue_t *_sensor_value = NULL;
+static bool _reset_occurred = false;
 
 /**
  * @brief Construct a new Adafruit_BNO08x::Adafruit_BNO08x object
@@ -82,15 +86,32 @@ bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
     return false;
   }
 
-  i2c_HAL.open = i2chal_open;
-  i2c_HAL.close = i2chal_close;
-  i2c_HAL.read = i2chal_read;
-  i2c_HAL.write = i2chal_write;
-  i2c_HAL.getTimeUs = i2chal_getTimeUs;
+  _HAL.open = i2chal_open;
+  _HAL.close = i2chal_close;
+  _HAL.read = i2chal_read;
+  _HAL.write = i2chal_write;
+  _HAL.getTimeUs = hal_getTimeUs;
 
 
   return _init(sensor_id);
 }
+
+bool Adafruit_BNO08x::begin_UART(HardwareSerial *serial,
+                               int32_t sensor_id) {
+  i2c_dev = NULL;
+  spi_dev = NULL;
+
+  uart_dev = serial;
+
+  _HAL.open = uarthal_open;
+  _HAL.close = uarthal_close;
+  _HAL.read = uarthal_read;
+  _HAL.write = uarthal_write;
+  _HAL.getTimeUs = hal_getTimeUs;
+
+  return _init(sensor_id);
+}
+
 
 /*!
  *    @brief  Sets up the hardware and initializes hardware SPI
@@ -151,71 +172,100 @@ bool Adafruit_BNO08x::begin_SPI(int8_t cs_pin, int8_t sck_pin, int8_t miso_pin,
  *   @returns True if chip identified and initialized
  */
 bool Adafruit_BNO08x::_init(int32_t sensor_id) {
+  int status;
 
+  hardwareReset();
 
-  hardware_reset();
-  // do any software reset or other initial setup
-
-  // TODO: update for correct sensor types
-  int success = sh2_open(&i2c_HAL, i2chal_callback, NULL);
-  if (success != SH2_OK) {
+  // Open SH2 interface (also registers non-sensor event handler.)
+  status = sh2_open(&_HAL, hal_callback, NULL);
+  if (status != SH2_OK) {
     return false;
   }
 
-  sh2_ProductIds_t prodIds;
+  // Check connection partially by getting the product id's
   memset(&prodIds, 0, sizeof(prodIds));
-  success = sh2_getProdIds(&prodIds);
-  if (success != SH2_OK) {
+  status = sh2_getProdIds(&prodIds);
+  if (status != SH2_OK) {
     return false;
   }
 
-  // Report the results
-  for (int n = 0; n < prodIds.numEntries; n++) {
-    Serial.printf("Part %d : Version %d.%d.%d Build %d\n",
-                  prodIds.entry[n].swPartNumber,
-                  prodIds.entry[n].swVersionMajor, prodIds.entry[n].swVersionMinor, 
-                  prodIds.entry[n].swVersionPatch, prodIds.entry[n].swBuildNumber);
-  }
+
+  // Register sensor listener
+  sh2_setSensorCallback(sensorHandler, NULL);
 
   return true;
 }
 
-void Adafruit_BNO08x::hardware_reset(void) {
+void Adafruit_BNO08x::hardwareReset(void) {
   if (_reset_pin != -1) {
     Serial.println("BNO08x Hardware reset");
 
     pinMode(_reset_pin, OUTPUT);
     digitalWrite(_reset_pin, HIGH);
-    delay(1);
+    delay(10);
     digitalWrite(_reset_pin, LOW);
-    delay(1);
+    delay(10);
     digitalWrite(_reset_pin, HIGH);
-    delay(100);
+    delay(10);
   }
 }
 
-/**
- * @brief Performs a software reset initializing registers to their power on
- * state
- *
- */
-void Adafruit_BNO08x::software_reset(void) {
+bool Adafruit_BNO08x::getSensorEvent(sh2_SensorValue_t *value) {
+  _sensor_value = value;
+  
+  value->timestamp = 0;
+
+  sh2_service();
+  
+  if (value->timestamp == 0) {
+    // no new events
+    return false;
+  }
+
+  return true;
 
 }
 
-int i2chal_open(sh2_Hal_t *self) {
+bool Adafruit_BNO08x::enableReport(sh2_SensorId_t sensorId, uint32_t interval_us) {
+  static sh2_SensorConfig_t config;
+
+  // These sensor options are disabled or not used in most cases
+  config.changeSensitivityEnabled = false;
+  config.wakeupEnabled = false;
+  config.changeSensitivityRelative = false;
+  config.alwaysOnEnabled = false;
+  config.changeSensitivity = 0;
+  config.batchInterval_us = 0;
+  config.sensorSpecific = 0;  
+
+  config.reportInterval_us = interval_us;
+  int status = sh2_setSensorConfig(sensorId, &config);
+
+  if (status != SH2_OK) {
+    return false;
+  }
+  
+  return true;
+}
+
+
+/**************************************** I2C interface ***********************************************************/
+
+static int i2chal_open(sh2_Hal_t *self) {
   Serial.println("I2C HAL open");
   return 0;
 }
 
 
-void i2chal_close(sh2_Hal_t *self) {
+static void i2chal_close(sh2_Hal_t *self) {
   Serial.println("I2C HAL close");
 }
 
-int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
                 uint32_t *t_us) {
-  Serial.println("I2C HAL read");
+  //Serial.println("I2C HAL read");
+
+  uint8_t *pBufferOrig = pBuffer;
 
   uint8_t header[4];
   if (! i2c_dev->read(header, 4) ) {
@@ -227,11 +277,13 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
   // Unset the "continue" bit
   packet_size &= ~0x8000;
 
+  /*
   Serial.print("Read SHTP header. "); 
   Serial.print("Packet size: "); 
   Serial.print(packet_size);
   Serial.print(" & buffer size: "); 
   Serial.println(len);
+  */
 
 
   size_t i2c_buffer_max = i2c_dev->maxBufferSize();
@@ -254,8 +306,8 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
       read_size = min(i2c_buffer_max, cargo_remaining+4); 
     }
 
-    Serial.print("Reading from I2C: "); Serial.println(read_size);
-    Serial.print("Remaining to read: "); Serial.println(cargo_remaining);
+    //Serial.print("Reading from I2C: "); Serial.println(read_size);
+    //Serial.print("Remaining to read: "); Serial.println(cargo_remaining);
     
     if (!i2c_dev->read(i2c_buffer, read_size)) {
       return 0;
@@ -275,16 +327,25 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
     }
   }
 
+  for (int i=0; i<packet_size; i++) {
+    Serial.print(pBufferOrig[i], HEX); 
+    Serial.print(", ");
+    if (i % 16 == 15) Serial.println();
+  }                 
+  Serial.println();
+
   return packet_size;
 }
 
-int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
+static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
   size_t i2c_buffer_max = i2c_dev->maxBufferSize();
 
+  /*
   Serial.print("I2C HAL write packet size: ");
   Serial.print(len);
   Serial.print(" & max buffer size: "); 
   Serial.println(i2c_buffer_max);
+  */
 
   uint16_t write_size = min(i2c_buffer_max, len); 
   if (!i2c_dev->write(pBuffer, write_size)) {
@@ -294,13 +355,172 @@ int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
   return write_size;
 }
 
-uint32_t i2chal_getTimeUs(sh2_Hal_t *self) {
+/**************************************** UART interface ***********************************************************/
+
+static int uarthal_open(sh2_Hal_t *self) {
+  Serial.println("UART HAL open");
+  uart_dev->begin(3000000);
+
+  // flush input
+  while (uart_dev->available()) {
+    uart_dev->read();
+    yield();
+  }
+
+  // send a software reset
+  uint8_t softreset_pkt[] = {0x7E, 1, 5, 0, 1, 0, 1, 0x7E};
+  for (int i=0; i<sizeof(softreset_pkt); i++) {
+    uart_dev->write(softreset_pkt[i]);
+    delay(1);
+  }
+  
+
+  return 0;
+}
+
+
+static void uarthal_close(sh2_Hal_t *self) {
+  //Serial.println("UART HAL close");
+  uart_dev->end();
+}
+
+static int uarthal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+                uint32_t *t_us) {
+  uint8_t c;
+  uint16_t packet_size = 0;
+
+  //Serial.println("UART HAL read");
+
+  // read packet start
+  while (1) {
+    yield();
+
+    if (! uart_dev->available()) {
+      continue;
+    }
+    c = uart_dev->read();
+    //Serial.print(c, HEX); Serial.print(", ");
+    if (c == 0x7E) {
+      break;
+    }
+  }
+
+  // read protocol id
+  while (uart_dev->available() < 2) {
+    yield();
+  }
+  c = uart_dev->read();
+  //Serial.print(c, HEX); Serial.print(", ");
+  if (c == 0x7E) {
+    c = uart_dev->read();
+    //Serial.print(c, HEX); Serial.print(", ");
+    if (c != 0x01) {
+      return 0;
+    }
+  } else if (c != 0x01) {
+    return 0;
+  }
+
+  while (true) {
+    yield();
+
+    if (! uart_dev->available()) {
+      continue;
+    }
+    c = uart_dev->read();
+    //Serial.print(c, HEX); Serial.print(", ");
+    if (c == 0x7E) {
+      break;
+    }
+    if (c == 0x7D) { 
+      // escape!
+      while (! uart_dev->available()) {
+        continue;
+      }
+      c = uart_dev->read();
+      c ^= 0x20;
+    }
+    pBuffer[packet_size] = c;
+    packet_size++;
+    
+  }
+
+  /*
+  Serial.print("Read UART packet size: ");
+  Serial.println(packet_size);
+  for (int i=0; i<packet_size; i++) {
+    Serial.print(pBuffer[i], HEX); 
+    Serial.print(", ");
+    if (i % 16 == 15) Serial.println();
+  }                 
+  Serial.println();
+  */
+
+  return packet_size;
+}
+
+static int uarthal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
+  uint8_t c;
+
+  //Serial.print("UART HAL write packet size: ");
+  //Serial.println(len);
+
+  // start byte
+  uart_dev->write(0x7E);
+  delay(1);
+  // protocol id
+  uart_dev->write(0x01);
+  delay(1);
+  
+  for (int i=0; i<len; i++) {
+    c = pBuffer[i];
+    if ((c == 0x7E) || (c == 0x7D)) {
+      uart_dev->write(0x7D); // control
+      delay(1);
+      c ^= 0x20;
+    }
+    uart_dev->write(c);
+    delay(1);
+  }
+  // end byte
+  uart_dev->write(0x7E);
+
+  return len;
+}
+
+/**************************************** HAL interface ***********************************************************/
+
+
+
+static uint32_t hal_getTimeUs(sh2_Hal_t *self) {
   uint32_t t = millis() * 1000;
   // Serial.printf("I2C HAL get time: %d\n", t);
   return t;
 }
 
 
-void i2chal_callback(void * cookie, sh2_AsyncEvent_t *pEvent) {
-  Serial.println("I2C HAL callback");
+static void hal_callback(void * cookie, sh2_AsyncEvent_t *pEvent) {
+  Serial.println("HAL callback");
+  // If we see a reset, set a flag so that sensors will be reconfigured.
+  if (pEvent->eventId == SH2_RESET) {
+    _reset_occurred = true;
+  }
 }
+
+
+// Handle sensor events.
+static void sensorHandler(void * cookie, sh2_SensorEvent_t *event) {
+  int rc;
+  float t;
+  float r, i, j, k, acc_deg, x, y, z;
+
+  //Serial.println("Got an event!");
+
+  rc = sh2_decodeSensorEvent(_sensor_value, event);
+  if (rc != SH2_OK) {
+    Serial.println("BNO08x - Error decoding sensor event");
+    _sensor_value->timestamp = 0;
+    return;
+  }
+}
+
