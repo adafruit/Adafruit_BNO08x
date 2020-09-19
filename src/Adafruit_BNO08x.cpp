@@ -83,6 +83,7 @@ bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
   i2c_dev = new Adafruit_I2CDevice(i2c_address, wire);
 
   if (!i2c_dev->begin()) {
+    Serial.println(F("I2C address not found"));
     return false;
   }
 
@@ -260,13 +261,29 @@ bool Adafruit_BNO08x::enableReport(sh2_SensorId_t sensorId, uint32_t interval_us
 /**************************************** I2C interface ***********************************************************/
 
 static int i2chal_open(sh2_Hal_t *self) {
-  Serial.println("I2C HAL open");
+  //Serial.println("I2C HAL open");
+
+  // send a software reset
+  uint8_t softreset_pkt[] = {5, 0, 1, 0, 1};
+  //Serial.println("Sending softreset");
+  if (!i2c_dev->write(softreset_pkt, 5)) {
+    return -1;
+  }
+  //Serial.println("OK!");
+  delay(100);
+
+  if (!i2c_dev->write(softreset_pkt, 5)) {
+    return -1;
+  }
+  //Serial.println("OK!");
+  delay(100);
+
   return 0;
 }
 
 
 static void i2chal_close(sh2_Hal_t *self) {
-  Serial.println("I2C HAL close");
+  //Serial.println("I2C HAL close");
 }
 
 static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
@@ -292,7 +309,6 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
   Serial.print(" & buffer size: "); 
   Serial.println(len);
   */
-
 
   size_t i2c_buffer_max = i2c_dev->maxBufferSize();
 
@@ -335,12 +351,14 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
     }
   }
 
+  /*
   for (int i=0; i<packet_size; i++) {
     Serial.print(pBufferOrig[i], HEX); 
     Serial.print(", ");
     if (i % 16 == 15) Serial.println();
   }                 
   Serial.println();
+  */
 
   return packet_size;
 }
@@ -366,7 +384,7 @@ static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
 /**************************************** UART interface ***********************************************************/
 
 static int uarthal_open(sh2_Hal_t *self) {
-  Serial.println("UART HAL open");
+  //Serial.println("UART HAL open");
   uart_dev->begin(3000000);
 
   // flush input
