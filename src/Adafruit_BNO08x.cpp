@@ -210,6 +210,14 @@ void Adafruit_BNO08x::hardwareReset(void) {
   }
 }
 
+
+bool Adafruit_BNO08x::wasReset(void) {
+  bool x = _reset_occurred;
+  _reset_occurred = false;
+
+  return x;
+}
+
 bool Adafruit_BNO08x::getSensorEvent(sh2_SensorValue_t *value) {
   _sensor_value = value;
   
@@ -500,9 +508,9 @@ static uint32_t hal_getTimeUs(sh2_Hal_t *self) {
 
 
 static void hal_callback(void * cookie, sh2_AsyncEvent_t *pEvent) {
-  Serial.println("HAL callback");
   // If we see a reset, set a flag so that sensors will be reconfigured.
   if (pEvent->eventId == SH2_RESET) {
+    Serial.println("Reset!");
     _reset_occurred = true;
   }
 }

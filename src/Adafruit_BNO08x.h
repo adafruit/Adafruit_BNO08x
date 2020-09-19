@@ -48,6 +48,7 @@ public:
                  int8_t mosi_pin, int32_t sensor_id = 0);
 
   void hardwareReset(void);
+  bool wasReset(void);
 
   bool enableReport(sh2_SensorId_t sensor, uint32_t interval_us = 10000);
   bool getSensorEvent(sh2_SensorValue_t *value);
