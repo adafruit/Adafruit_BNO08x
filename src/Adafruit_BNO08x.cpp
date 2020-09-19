@@ -44,7 +44,9 @@ Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
  * @brief Construct a new Adafruit_BNO08x::Adafruit_BNO08x object
  *
  */
-Adafruit_BNO08x::Adafruit_BNO08x(void) {}
+Adafruit_BNO08x::Adafruit_BNO08x(int8_t reset_pin) {
+  _reset_pin = reset_pin;
+}
 
 
 /**
@@ -156,14 +158,40 @@ bool Adafruit_BNO08x::_init(int32_t sensor_id) {
 
   // TODO: update for correct sensor types
   int success = sh2_open(&i2c_HAL, i2chal_callback, NULL);
-  if(success == 0){
-    return true;
+  if (success != SH2_OK) {
+    return false;
   }
-  return false;
+
+  sh2_ProductIds_t prodIds;
+  memset(&prodIds, 0, sizeof(prodIds));
+  success = sh2_getProdIds(&prodIds);
+  if (success != SH2_OK) {
+    return false;
+  }
+
+  // Report the results
+  for (int n = 0; n < prodIds.numEntries; n++) {
+    Serial.printf("Part %d : Version %d.%d.%d Build %d\n",
+                  prodIds.entry[n].swPartNumber,
+                  prodIds.entry[n].swVersionMajor, prodIds.entry[n].swVersionMinor, 
+                  prodIds.entry[n].swVersionPatch, prodIds.entry[n].swBuildNumber);
+  }
+
+  return true;
 }
 
 void Adafruit_BNO08x::hardware_reset(void) {
+  if (_reset_pin != -1) {
+    Serial.println("BNO08x Hardware reset");
 
+    pinMode(_reset_pin, OUTPUT);
+    digitalWrite(_reset_pin, HIGH);
+    delay(1);
+    digitalWrite(_reset_pin, LOW);
+    delay(1);
+    digitalWrite(_reset_pin, HIGH);
+    delay(100);
+  }
 }
 
 /**
@@ -189,59 +217,81 @@ int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
                 uint32_t *t_us) {
   Serial.println("I2C HAL read");
 
-  Serial.println("Read SHTP header"); 
   uint8_t header[4];
-  i2c_dev->read(header, 4);
-  uint16_t packet_size = header[0];
-  packet_size |= (header[1] << 8);
+  if (! i2c_dev->read(header, 4) ) {
+    return 0;
+  }
+
+  // Determine amount to read
+  uint16_t packet_size = (uint16_t)header[0] | (uint16_t)header[1] << 8;
   // Unset the "continue" bit
   packet_size &= ~0x8000;
+
+  Serial.print("Read SHTP header. "); 
+  Serial.print("Packet size: "); 
+  Serial.print(packet_size);
+  Serial.print(" & buffer size: "); 
+  Serial.println(len);
+
 
   size_t i2c_buffer_max = i2c_dev->maxBufferSize();
 
   unsigned total_read_len = len;
   if (packet_size > len){
-    // packet wouldn't fit
+    // packet wouldn't fit in our buffer
     return 0;
   }
   // the number of non-header bytes to read
-  uint16_t data_remaining = packet_size-4;
-  uint8_t buffer[i2c_buffer_max];// should be read_size/i2c buffer size
+  uint16_t cargo_remaining = packet_size;
+  uint8_t i2c_buffer[i2c_buffer_max];
   uint16_t read_size;
-  size_t max_data_read_len = (i2c_buffer_max - 4);
-  uint16_t data_bytes_copied=0;
+  bool first_read = true;
 
-  while (data_remaining > 0) {
-    read_size = data_remaining; // data + header
-    if (read_size > max_data_read_len) {
-      read_size = max_data_read_len;
+  while (cargo_remaining > 0) {
+    if (first_read) {
+      read_size = min(i2c_buffer_max, cargo_remaining); 
+    } else {
+      read_size = min(i2c_buffer_max, cargo_remaining+4); 
     }
-    read_size += 4; // total read size = data read size +  header
 
-    if (!i2c_dev->read(buffer, read_size)) {
+    Serial.print("Reading from I2C: "); Serial.println(read_size);
+    Serial.print("Remaining to read: "); Serial.println(cargo_remaining);
+    
+    if (!i2c_dev->read(i2c_buffer, read_size)) {
       return 0;
     }
 
-    data_remaining -= (read_size-4);
-
-    // if the amount of data we've read so far is more than we can read at once
-    if (((packet_size-4)-data_remaining) > max_data_read_len){
-      // this is not the first read, so copy from 4 bytes after the beginning of the local buffer to skip the header
-      memcpy(pBuffer+data_bytes_copied + 4, buffer+4, read_size-4);
-    } else {
+    if (first_read) {
       // this is the first read, so copy everything, including the header
-      memcpy(pBuffer, buffer, read_size);
-
+      memcpy(pBuffer, i2c_buffer, read_size);
+      // advance our pointer
+      pBuffer += read_size;
+      cargo_remaining -= read_size;
+      first_read = false;
+    } else {
+      // this is not the first read, so copy from 4 bytes after the beginning of the local buffer to skip the header
+      memcpy(pBuffer, i2c_buffer+4, read_size-4);      
+      cargo_remaining -= read_size - 4;
     }
-    data_bytes_copied = ((packet_size-4)-data_remaining);
   }
 
   return packet_size;
 }
 
 int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
-  Serial.println("I2C HAL write");
-  return 0;
+  size_t i2c_buffer_max = i2c_dev->maxBufferSize();
+
+  Serial.print("I2C HAL write packet size: ");
+  Serial.print(len);
+  Serial.print(" & max buffer size: "); 
+  Serial.println(i2c_buffer_max);
+
+  uint16_t write_size = min(i2c_buffer_max, len); 
+  if (!i2c_dev->write(pBuffer, write_size)) {
+    return 0;
+  }
+  
+  return write_size;
 }
 
 uint32_t i2chal_getTimeUs(sh2_Hal_t *self) {

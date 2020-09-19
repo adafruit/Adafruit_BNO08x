@@ -23,6 +23,7 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include "sh2.h"
+#include "sh2_err.h"
 
 #define BNO08x_I2CADDR_DEFAULT 0x4A
 
@@ -33,7 +34,7 @@
  */
 class Adafruit_BNO08x {
 public:
-  Adafruit_BNO08x();
+  Adafruit_BNO08x(int8_t reset_pin = -1);
   ~Adafruit_BNO08x();
 
   bool begin_I2C(uint8_t i2c_addr = BNO08x_I2CADDR_DEFAULT,
@@ -51,7 +52,7 @@ public:
 protected:
   virtual bool _init(int32_t sensor_id);
 
-
+  int8_t _reset_pin = -1;
   sh2_Hal_t i2c_HAL;
 };
 
