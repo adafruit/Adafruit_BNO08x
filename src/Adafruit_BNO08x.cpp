@@ -38,6 +38,8 @@
 #include "Adafruit_BNO08x.h"
 
 static Adafruit_SPIDevice *spi_dev = NULL; ///< Pointer to SPI bus interface
+static int8_t _int_pin, _cs_pin, _reset_pin;
+
 static Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
 static HardwareSerial *uart_dev = NULL; 
 
@@ -75,7 +77,6 @@ Adafruit_BNO08x::~Adafruit_BNO08x(void) {
  */
 bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
                                int32_t sensor_id) {
-  spi_dev = NULL;
   if (i2c_dev) {
     delete i2c_dev; // remove old interface
   }
@@ -99,9 +100,6 @@ bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
 
 bool Adafruit_BNO08x::begin_UART(HardwareSerial *serial,
                                int32_t sensor_id) {
-  i2c_dev = NULL;
-  spi_dev = NULL;
-
   uart_dev = serial;
 
   _HAL.open = uarthal_open;
@@ -122,9 +120,13 @@ bool Adafruit_BNO08x::begin_UART(HardwareSerial *serial,
  *            The user-defined ID to differentiate different sensors
  *    @return True if initialization was successful, otherwise false.
  */
-bool Adafruit_BNO08x::begin_SPI(uint8_t cs_pin, SPIClass *theSPI,
+bool Adafruit_BNO08x::begin_SPI(uint8_t cs_pin, uint8_t int_pin, SPIClass *theSPI,
                                int32_t sensor_id) {
   i2c_dev = NULL;
+
+  _int_pin = int_pin;
+  pinMode(_int_pin, INPUT_PULLUP);
+
 
   if (spi_dev) {
     delete spi_dev; // remove old interface
@@ -132,39 +134,18 @@ bool Adafruit_BNO08x::begin_SPI(uint8_t cs_pin, SPIClass *theSPI,
   spi_dev = new Adafruit_SPIDevice(cs_pin,
                                    1000000,               // frequency
                                    SPI_BITORDER_MSBFIRST, // bit order
-                                   SPI_MODE0,             // data mode
+                                   SPI_MODE3,             // data mode
                                    theSPI);
   if (!spi_dev->begin()) {
     return false;
   }
 
-  return _init(sensor_id);
-}
+  _HAL.open = spihal_open;
+  _HAL.close = spihal_close;
+  _HAL.read = spihal_read;
+  _HAL.write = spihal_write;
+  _HAL.getTimeUs = hal_getTimeUs;
 
-/*!
- *    @brief  Sets up the hardware and initializes software SPI
- *    @param  cs_pin The arduino pin # connected to chip select
- *    @param  sck_pin The arduino pin # connected to SPI clock
- *    @param  miso_pin The arduino pin # connected to SPI MISO
- *    @param  mosi_pin The arduino pin # connected to SPI MOSI
- *    @param  sensor_id
- *            The user-defined ID to differentiate different sensors
- *    @return True if initialization was successful, otherwise false.
- */
-bool Adafruit_BNO08x::begin_SPI(int8_t cs_pin, int8_t sck_pin, int8_t miso_pin,
-                               int8_t mosi_pin, int32_t sensor_id) {
-  i2c_dev = NULL;
-
-  if (spi_dev) {
-    delete spi_dev; // remove old interface
-  }
-  spi_dev = new Adafruit_SPIDevice(cs_pin, sck_pin, miso_pin, mosi_pin,
-                                   1000000,               // frequency
-                                   SPI_BITORDER_MSBFIRST, // bit order
-                                   SPI_MODE0);            // data mode
-  if (!spi_dev->begin()) {
-    return false;
-  }
   return _init(sensor_id);
 }
 
@@ -198,17 +179,7 @@ bool Adafruit_BNO08x::_init(int32_t sensor_id) {
 }
 
 void Adafruit_BNO08x::hardwareReset(void) {
-  if (_reset_pin != -1) {
-    Serial.println("BNO08x Hardware reset");
-
-    pinMode(_reset_pin, OUTPUT);
-    digitalWrite(_reset_pin, HIGH);
-    delay(10);
-    digitalWrite(_reset_pin, LOW);
-    delay(10);
-    digitalWrite(_reset_pin, HIGH);
-    delay(10);
-  }
+  hal_hardwareReset();
 }
 
 
@@ -514,9 +485,107 @@ static int uarthal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
   return len;
 }
 
+/**************************************** UART interface ***********************************************************/
+
+static int spihal_open(sh2_Hal_t *self) {
+  //Serial.println("SPI HAL open");
+
+  spihal_wait_for_int();
+
+  return 0;
+}
+
+static bool spihal_wait_for_int(void) {
+  for (int i=0; i<500; i++) {
+    if (! digitalRead(_int_pin)) return true;
+    //Serial.print(".");
+    delay(1);
+  }
+  //Serial.println("Timed out!");
+  hal_hardwareReset();
+
+  return false;
+}
+
+static void spihal_close(sh2_Hal_t *self) {
+  //Serial.println("SPI HAL close");
+}
+
+static int spihal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+                uint32_t *t_us) {
+  //Serial.println("SPI HAL read");
+
+  uint8_t c;
+  uint16_t packet_size = 0;
+
+  if (! spihal_wait_for_int()) {
+    return 0;
+  }
+
+  if (! spi_dev->read(pBuffer, 4, 0x00) ) {
+    return 0;
+  }
+
+  // Determine amount to read
+  packet_size = (uint16_t)pBuffer[0] | (uint16_t)pBuffer[1] << 8;
+  // Unset the "continue" bit
+  packet_size &= ~0x8000;
+
+  /*
+  Serial.print("Read SHTP header. "); 
+  Serial.print("Packet size: "); 
+  Serial.print(packet_size);
+  Serial.print(" & buffer size: "); 
+  Serial.println(len);
+  */
+
+  if (packet_size > len) {
+    return 0;
+  }
+
+
+  if (! spihal_wait_for_int()) {
+    return 0;
+  }
+  
+  if (! spi_dev->read(pBuffer, packet_size, 0x00) ) {
+    return 0;
+  }
+
+  return packet_size;
+}
+
+static int spihal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
+  uint8_t c;
+
+  //Serial.print("SPI HAL write packet size: ");
+  //Serial.println(len);
+
+  if (! spihal_wait_for_int()) {
+    return 0;
+  }
+  
+  spi_dev->write(pBuffer, len);
+
+  return len;
+}
+
+
 /**************************************** HAL interface ***********************************************************/
 
+static void hal_hardwareReset(void) {
+  if (_reset_pin != -1) {
+    //Serial.println("BNO08x Hardware reset");
 
+    pinMode(_reset_pin, OUTPUT);
+    digitalWrite(_reset_pin, HIGH);
+    delay(10);
+    digitalWrite(_reset_pin, LOW);
+    delay(10);
+    digitalWrite(_reset_pin, HIGH);
+    delay(10);
+  }
+}
 
 static uint32_t hal_getTimeUs(sh2_Hal_t *self) {
   uint32_t t = millis() * 1000;
@@ -528,7 +597,7 @@ static uint32_t hal_getTimeUs(sh2_Hal_t *self) {
 static void hal_callback(void * cookie, sh2_AsyncEvent_t *pEvent) {
   // If we see a reset, set a flag so that sensors will be reconfigured.
   if (pEvent->eventId == SH2_RESET) {
-    Serial.println("Reset!");
+    //Serial.println("Reset!");
     _reset_occurred = true;
   }
 }

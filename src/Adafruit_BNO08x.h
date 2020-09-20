@@ -42,10 +42,9 @@ public:
                  TwoWire *wire = &Wire, int32_t sensor_id = 0);
   bool begin_UART(HardwareSerial *serial, int32_t sensor_id = 0);
 
-  bool begin_SPI(uint8_t cs_pin, SPIClass *theSPI = &SPI,
+  bool begin_SPI(uint8_t cs_pin,  uint8_t int_pin,
+                 SPIClass *theSPI = &SPI,
                  int32_t sensor_id = 0);
-  bool begin_SPI(int8_t cs_pin, int8_t sck_pin, int8_t miso_pin,
-                 int8_t mosi_pin, int32_t sensor_id = 0);
 
   void hardwareReset(void);
   bool wasReset(void);
@@ -57,7 +56,6 @@ public:
 protected:
   virtual bool _init(int32_t sensor_id);
 
-  int8_t _reset_pin = -1;
   sh2_Hal_t _HAL;
 };
 
@@ -72,9 +70,16 @@ static int uarthal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_
 static void uarthal_close(sh2_Hal_t *self);
 static int uarthal_open(sh2_Hal_t *self);
 
+static bool spihal_wait_for_int(void);
+static int spihal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
+static int spihal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len, uint32_t *t_us);
+static void spihal_close(sh2_Hal_t *self);
+static int spihal_open(sh2_Hal_t *self);
+
 
 static uint32_t hal_getTimeUs(sh2_Hal_t *self);
 static void hal_callback(void * cookie, sh2_AsyncEvent_t *pEvent);
 static void sensorHandler(void * cookie, sh2_SensorEvent_t *pEvent);
+static void hal_hardwareReset(void);
 
 #endif
