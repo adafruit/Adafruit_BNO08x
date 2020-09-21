@@ -26,6 +26,10 @@
 #ifndef SH2_SENSORVALUE_H
 #define SH2_SENSORVALUE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 
 #include "sh2.h"
@@ -498,5 +502,10 @@ typedef struct sh2_SensorValue {
 } sh2_SensorValue_t;
 
 int sh2_decodeSensorEvent(sh2_SensorValue_t *value, const sh2_SensorEvent_t *event);
+
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif
