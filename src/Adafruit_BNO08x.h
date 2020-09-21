@@ -26,7 +26,7 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 
-#define BNO08x_I2CADDR_DEFAULT 0x4A
+#define BNO08x_I2CADDR_DEFAULT 0x4A ///< The default I2C address
 
 /*!
  *    @brief  Class that stores state and functions for interacting with
@@ -50,12 +50,13 @@ public:
   bool enableReport(sh2_SensorId_t sensor, uint32_t interval_us = 10000);
   bool getSensorEvent(sh2_SensorValue_t *value);
 
-  sh2_ProductIds_t prodIds;
+  sh2_ProductIds_t prodIds; ///< The product IDs returned by the sensor
 
 protected:
   virtual bool _init(int32_t sensor_id);
 
-  sh2_Hal_t _HAL;
+  sh2_Hal_t
+      _HAL; ///< The struct representing the SH2 Hardware Abstraction Layer
 };
 
 static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);

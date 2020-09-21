@@ -51,6 +51,12 @@ static bool _reset_occurred = false;
  * @brief Construct a new Adafruit_BNO08x::Adafruit_BNO08x object
  *
  */
+
+/**
+ * @brief Construct a new Adafruit_BNO08x::Adafruit_BNO08x object
+ *
+ * @param reset_pin The arduino pin # connected to the BNO Reset pin
+ */
 Adafruit_BNO08x::Adafruit_BNO08x(int8_t reset_pin) { _reset_pin = reset_pin; }
 
 /**
@@ -94,6 +100,14 @@ bool Adafruit_BNO08x::begin_I2C(uint8_t i2c_address, TwoWire *wire,
   return _init(sensor_id);
 }
 
+/**
+ *  @brief  Sets up the hardware and initializes UART
+ *
+ * @param serial Pointer to Stream (HardwareSerial/SoftwareSerial) interface
+ * @param sensor_id
+ *            The user-defined ID to differentiate different sensors
+ * @return  true if initialization was successful, otherwise false.
+ */
 bool Adafruit_BNO08x::begin_UART(HardwareSerial *serial, int32_t sensor_id) {
   uart_dev = serial;
 
@@ -109,10 +123,11 @@ bool Adafruit_BNO08x::begin_UART(HardwareSerial *serial, int32_t sensor_id) {
 /*!
  *    @brief  Sets up the hardware and initializes hardware SPI
  *    @param  cs_pin The arduino pin # connected to chip select
+ *    @param  int_pin The arduino pin # connected to BNO08x INT
  *    @param  theSPI The SPI object to be used for SPI connections.
  *    @param  sensor_id
  *            The user-defined ID to differentiate different sensors
- *    @return True if initialization was successful, otherwise false.
+ *    @return true if initialization was successful, otherwise false.
  */
 bool Adafruit_BNO08x::begin_SPI(uint8_t cs_pin, uint8_t int_pin,
                                 SPIClass *theSPI, int32_t sensor_id) {
@@ -170,8 +185,17 @@ bool Adafruit_BNO08x::_init(int32_t sensor_id) {
   return true;
 }
 
+/**
+ * @brief Reset the device using the Reset pin
+ *
+ */
 void Adafruit_BNO08x::hardwareReset(void) { hal_hardwareReset(); }
 
+/**
+ * @brief Check if a reset has occured
+ *
+ * @return true: a reset has occured false: no reset has occoured
+ */
 bool Adafruit_BNO08x::wasReset(void) {
   bool x = _reset_occurred;
   _reset_occurred = false;
@@ -179,6 +203,13 @@ bool Adafruit_BNO08x::wasReset(void) {
   return x;
 }
 
+/**
+ * @brief Fill the given sensor value object with a new report
+ *
+ * @param value Pointer to an sh2_SensorValue_t struct to fil
+ * @return true: The report object was filled with a new report
+ * @return false: No new report available to fill
+ */
 bool Adafruit_BNO08x::getSensorEvent(sh2_SensorValue_t *value) {
   _sensor_value = value;
 
@@ -194,6 +225,14 @@ bool Adafruit_BNO08x::getSensorEvent(sh2_SensorValue_t *value) {
   return true;
 }
 
+/**
+ * @brief Enable the given report type
+ *
+ * @param sensorId The report ID to enable
+ * @param interval_us The update interval for reports to be generated, in
+ * milliseconds
+ * @return true: success false: failure
+ */
 bool Adafruit_BNO08x::enableReport(sh2_SensorId_t sensorId,
                                    uint32_t interval_us) {
   static sh2_SensorConfig_t config;
