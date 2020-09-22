@@ -23,7 +23,7 @@ jobs:
       run: python3 ci/build_platform.py main_platforms
 
     - name: clang
-      run: python3 ci/run-clang-format.py -e "ci/*" -e "bin/*" Adafruit_*
+      run: python3 ci/run-clang-format.py -e "ci/*" -e "bin/*" src/Adafruit_*
 
     - name: doxygen
       env:
