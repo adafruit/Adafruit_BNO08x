@@ -323,9 +323,9 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
 
   while (cargo_remaining > 0) {
     if (first_read) {
-      read_size = min(i2c_buffer_max, cargo_remaining);
+      read_size = min(i2c_buffer_max, (size_t)cargo_remaining);
     } else {
-      read_size = min(i2c_buffer_max, cargo_remaining + 4);
+      read_size = min(i2c_buffer_max, (size_t)cargo_remaining + 4);
     }
 
     // Serial.print("Reading from I2C: "); Serial.println(read_size);
