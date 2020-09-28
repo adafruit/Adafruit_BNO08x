@@ -28,6 +28,10 @@
 
 #define BNO08x_I2CADDR_DEFAULT 0x4A ///< The default I2C address
 
+/* Additional Activities not listed in SH-2 lib */
+#define PAC_ON_STAIRS 8
+#define PAC_OPTION_COUNT 9
+
 /*!
  *    @brief  Class that stores state and functions for interacting with
  *            the BNO08x 9-DOF Orientation IMU Fusion Breakout
