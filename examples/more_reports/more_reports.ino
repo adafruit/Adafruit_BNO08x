@@ -40,7 +40,6 @@ void setup(void) {
     Serial.println(bno08x.prodIds.entry[n].swBuildNumber);
   }
 
-  Serial.println("Setting desired reports");
   setReports();
 
   Serial.println("Reading events");
@@ -49,17 +48,48 @@ void setup(void) {
 
 // Here is where you define the sensor outputs you want to receive
 void setReports(void) {
+  Serial.println("Setting desired reports");
   if (!bno08x.enableReport(SH2_ACCELEROMETER)) {
     Serial.println("Could not enable accelerometer");
   }
-  // if (! bno08x.enableReport(SH2_GYROSCOPE_CALIBRATED)) {
-  //   Serial.println("Could not enable gyro");
-  // }
-  // if (! bno08x.enableReport(SH2_MAGNETIC_FIELD_CALIBRATED)) {
-  //   Serial.println("Could not enable magnetometer");
-  // }
+  if (!bno08x.enableReport(SH2_GYROSCOPE_CALIBRATED)) {
+    Serial.println("Could not enable gyroscope");
+  }
+  if (!bno08x.enableReport(SH2_MAGNETIC_FIELD_CALIBRATED)) {
+    Serial.println("Could not enable magnetic field calibrated");
+  }
+  if (!bno08x.enableReport(SH2_LINEAR_ACCELERATION)) {
+    Serial.println("Could not enable linear acceleration");
+  }
+  if (!bno08x.enableReport(SH2_ROTATION_VECTOR)) {
+    Serial.println("Could not enable rotation vector");
+  }
+  if (!bno08x.enableReport(SH2_GEOMAGNETIC_ROTATION_VECTOR)) {
+    Serial.println("Could not enable geomagnetic rotation vector");
+  }
   if (!bno08x.enableReport(SH2_GAME_ROTATION_VECTOR)) {
-    Serial.println("Could not enable game vector");
+    Serial.println("Could not enable game rotation vector");
+  }
+  if (!bno08x.enableReport(SH2_STEP_COUNTER)) {
+    Serial.println("Could not enable step counter");
+  }
+  if (!bno08x.enableReport(SH2_STABILITY_CLASSIFIER)) {
+    Serial.println("Could not enable stability classifier");
+  }
+  if (!bno08x.enableReport(SH2_RAW_ACCELEROMETER)) {
+    Serial.println("Could not enable raw accelerometer");
+  }
+  if (!bno08x.enableReport(SH2_RAW_GYROSCOPE)) {
+    Serial.println("Could not enable raw gyroscope");
+  }
+  if (!bno08x.enableReport(SH2_RAW_MAGNETOMETER)) {
+    Serial.println("Could not enable raw magnetometer");
+  }
+  if (!bno08x.enableReport(SH2_SHAKE_DETECTOR)) {
+    Serial.println("Could not enable shake detector");
+  }
+  if (!bno08x.enableReport(SH2_PERSONAL_ACTIVITY_CLASSIFIER)) {
+    Serial.println("Could not enable personal activity classifier");
   }
 }
 void printActivity(uint8_t activity_id) {
@@ -91,13 +121,18 @@ void printActivity(uint8_t activity_id) {
   case PAC_ON_STAIRS:
     Serial.print("On Stairs");
     break;
+  default:
+    Serial.print("NOT LISTED");
   }
+  Serial.print(" (");
+  Serial.print(activity_id);
+  Serial.print(")");
 }
 void loop() {
   delay(10);
 
   if (bno08x.wasReset()) {
-    Serial.println("Setting desired reports");
+    Serial.print("sensor was reset ");
     setReports();
   }
 
@@ -179,6 +214,7 @@ void loop() {
     break;
 
   case SH2_STABILITY_CLASSIFIER: {
+    Serial.print("Stability Classification: ");
     sh2_StabilityClassifier_t stability = sensorValue.un.stabilityClassifier;
     switch (stability.classification) {
     case STABILITY_CLASSIFIER_UNKNOWN:
@@ -252,16 +288,13 @@ void loop() {
     Serial.print("Activity classification - Most likely: ");
     printActivity(activity.mostLikelyState);
     Serial.println("");
-    Serial.print("Page:");
-    Serial.println(page_num);
-    Serial.print("Last page:");
-    Serial.println(activity.lastPage);
+
     Serial.println("Confidences:");
     // if PAC_OPTION_COUNT is ever > 10, we'll need to
     // care about page
-    for (uint8_t i; i < PAC_OPTION_COUNT; i++) {
+    for (uint8_t i = 0; i < PAC_OPTION_COUNT; i++) {
       Serial.print("\t");
-      printActivity(i + (page_num * 10));
+      printActivity(i);
       Serial.print(": ");
       Serial.println(activity.confidence[i]);
     }

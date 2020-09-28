@@ -38,7 +38,6 @@ void setup(void) {
     Serial.println(bno08x.prodIds.entry[n].swBuildNumber);
   }
 
-  Serial.println("Setting desired reports");
   setReports();
 
   Serial.println("Reading events");
@@ -47,6 +46,7 @@ void setup(void) {
 
 // Here is where you define the sensor outputs you want to receive
 void setReports(void) {
+  Serial.println("Setting desired reports");
   if (! bno08x.enableReport(SH2_GAME_ROTATION_VECTOR)) {
     Serial.println("Could not enable game vector");
   }
@@ -57,7 +57,7 @@ void loop() {
   delay(10);
 
   if (bno08x.wasReset()) {
-    Serial.println("Setting desired reports");
+    Serial.print("sensor was reset ");
     setReports();
   }
   
