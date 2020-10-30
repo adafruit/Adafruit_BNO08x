@@ -319,6 +319,7 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
   uint16_t cargo_remaining = packet_size;
   uint8_t i2c_buffer[i2c_buffer_max];
   uint16_t read_size;
+  uint16_t cargo_read_amount = 0;
   bool first_read = true;
 
   while (cargo_remaining > 0) {
@@ -336,18 +337,22 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
     }
 
     if (first_read) {
-      // this is the first read, so copy everything, including the header
-      memcpy(pBuffer, i2c_buffer, read_size);
-      // advance our pointer
-      pBuffer += read_size;
-      cargo_remaining -= read_size;
+      // The first time we're saving the "original" header, so include it in the
+      // cargo count
+      cargo_read_amount = read_size;
+      memcpy(pBuffer, i2c_buffer, cargo_read_amount);
       first_read = false;
     } else {
       // this is not the first read, so copy from 4 bytes after the beginning of
-      // the local buffer to skip the header
-      memcpy(pBuffer, i2c_buffer + 4, read_size - 4);
-      cargo_remaining -= read_size - 4;
+      // the i2c buffer to skip the header included with every new i2c read and
+      // don't include the header in the amount of cargo read
+      cargo_read_amount = read_size - 4;
+      memcpy(pBuffer, i2c_buffer + 4, cargo_read_amount);
     }
+    // advance our pointer by the amount of cargo read
+    pBuffer += cargo_read_amount;
+    // mark the cargo as received
+    cargo_remaining -= cargo_read_amount;
   }
 
   /*
