@@ -4,7 +4,11 @@
 // For SPI mode, we need a CS pin
 #define BNO08X_CS 10
 #define BNO08X_INT 9
-#define BNO08X_RESET 5
+
+// For SPI mode, we also need a RESET 
+//#define BNO08X_RESET 5
+// but not for I2C or UART
+#define BNO08X_RESET -1
 
 Adafruit_BNO08x bno08x(BNO08X_RESET);
 sh2_SensorValue_t sensorValue;
