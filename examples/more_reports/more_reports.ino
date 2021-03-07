@@ -5,7 +5,7 @@
 #define BNO08X_CS 10
 #define BNO08X_INT 9
 
-// For SPI mode, we also need a RESET 
+// For SPI mode, we also need a RESET
 //#define BNO08X_RESET 5
 // but not for I2C or UART
 #define BNO08X_RESET -1
@@ -64,6 +64,9 @@ void setReports(void) {
   }
   if (!bno08x.enableReport(SH2_LINEAR_ACCELERATION)) {
     Serial.println("Could not enable linear acceleration");
+  }
+  if (!bno08x.enableReport(SH2_GRAVITY)) {
+    Serial.println("Could not enable gravity vector");
   }
   if (!bno08x.enableReport(SH2_ROTATION_VECTOR)) {
     Serial.println("Could not enable rotation vector");
@@ -177,6 +180,14 @@ void loop() {
     Serial.print(sensorValue.un.linearAcceleration.y);
     Serial.print(" z: ");
     Serial.println(sensorValue.un.linearAcceleration.z);
+    break;
+  case SH2_GRAVITY:
+    Serial.print("Gravity - x: ");
+    Serial.print(sensorValue.un.gravity.x);
+    Serial.print(" y: ");
+    Serial.print(sensorValue.un.gravity.y);
+    Serial.print(" z: ");
+    Serial.println(sensorValue.un.gravity.z);
     break;
   case SH2_ROTATION_VECTOR:
     Serial.print("Rotation Vector - r: ");
