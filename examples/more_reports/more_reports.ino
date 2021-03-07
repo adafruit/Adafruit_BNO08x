@@ -5,7 +5,7 @@
 #define BNO08X_CS 10
 #define BNO08X_INT 9
 
-// For SPI mode, we also need a RESET 
+// For SPI mode, we also need a RESET
 //#define BNO08X_RESET 5
 // but not for I2C or UART
 #define BNO08X_RESET -1
