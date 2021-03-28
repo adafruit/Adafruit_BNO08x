@@ -217,7 +217,7 @@ bool Adafruit_BNO08x::getSensorEvent(sh2_SensorValue_t *value) {
 
   sh2_service();
 
-  if (value->timestamp == 0) {
+  if (value->timestamp == 0 && value->sensorId != SH2_GYRO_INTEGRATED_RV) {
     // no new events
     return false;
   }
