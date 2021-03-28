@@ -39,7 +39,6 @@ void setReports(sh2_SensorId_t reportType, long report_interval) {
   if (! bno08x.enableReport(reportType, report_interval)) {
     Serial.println("Could not enable stabilized remote vector");
   }
-  Serial.println("Done");
 }
 
 void setup(void) {
@@ -65,12 +64,7 @@ void setup(void) {
   delay(100);
 }
 
-void quaternionToEuler(float qw, float qx, float qy, float qz, euler_t* ypr, bool degrees = false) {
-
-    float qr = sensorValue.un.arvrStabilizedRV.real;
-    float qi = sensorValue.un.arvrStabilizedRV.i;
-    float qj = sensorValue.un.arvrStabilizedRV.j;
-    float qk = sensorValue.un.arvrStabilizedRV.k;
+void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees = false) {
 
     float sqr = sq(qr);
     float sqi = sq(qi);
