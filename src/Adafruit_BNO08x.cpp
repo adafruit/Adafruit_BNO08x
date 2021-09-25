@@ -230,7 +230,7 @@ bool Adafruit_BNO08x::getSensorEvent(sh2_SensorValue_t *value) {
  *
  * @param sensorId The report ID to enable
  * @param interval_us The update interval for reports to be generated, in
- * milliseconds
+ * microseconds
  * @return true: success false: failure
  */
 bool Adafruit_BNO08x::enableReport(sh2_SensorId_t sensorId,
