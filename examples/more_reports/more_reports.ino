@@ -299,7 +299,6 @@ void loop() {
 
     sh2_PersonalActivityClassifier_t activity =
         sensorValue.un.personalActivityClassifier;
-    uint8_t page_num = activity.page;
     Serial.print("Activity classification - Most likely: ");
     printActivity(activity.mostLikelyState);
     Serial.println("");
