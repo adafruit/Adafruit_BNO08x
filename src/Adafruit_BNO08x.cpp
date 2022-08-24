@@ -39,13 +39,37 @@
 #include "Adafruit_BNO08x.h"
 
 static Adafruit_SPIDevice *spi_dev = NULL; ///< Pointer to SPI bus interface
-static int8_t _int_pin, _cs_pin, _reset_pin;
+static int8_t _int_pin, _reset_pin;
 
 static Adafruit_I2CDevice *i2c_dev = NULL; ///< Pointer to I2C bus interface
 static HardwareSerial *uart_dev = NULL;
 
 static sh2_SensorValue_t *_sensor_value = NULL;
 static bool _reset_occurred = false;
+
+static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
+static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+                       uint32_t *t_us);
+static void i2chal_close(sh2_Hal_t *self);
+static int i2chal_open(sh2_Hal_t *self);
+
+static int uarthal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
+static int uarthal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+                        uint32_t *t_us);
+static void uarthal_close(sh2_Hal_t *self);
+static int uarthal_open(sh2_Hal_t *self);
+
+static bool spihal_wait_for_int(void);
+static int spihal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
+static int spihal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
+                       uint32_t *t_us);
+static void spihal_close(sh2_Hal_t *self);
+static int spihal_open(sh2_Hal_t *self);
+
+static uint32_t hal_getTimeUs(sh2_Hal_t *self);
+static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent);
+static void sensorHandler(void *cookie, sh2_SensorEvent_t *pEvent);
+static void hal_hardwareReset(void);
 
 /**
  * @brief Construct a new Adafruit_BNO08x::Adafruit_BNO08x object
@@ -288,7 +312,7 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
                        uint32_t *t_us) {
   // Serial.println("I2C HAL read");
 
-  uint8_t *pBufferOrig = pBuffer;
+  // uint8_t *pBufferOrig = pBuffer;
 
   uint8_t header[4];
   if (!i2c_dev->read(header, 4)) {
@@ -310,7 +334,6 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
 
   size_t i2c_buffer_max = i2c_dev->maxBufferSize();
 
-  unsigned total_read_len = len;
   if (packet_size > len) {
     // packet wouldn't fit in our buffer
     return 0;
@@ -548,7 +571,6 @@ static int spihal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
                        uint32_t *t_us) {
   // Serial.println("SPI HAL read");
 
-  uint8_t c;
   uint16_t packet_size = 0;
 
   if (!spihal_wait_for_int()) {
@@ -588,8 +610,6 @@ static int spihal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
 }
 
 static int spihal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len) {
-  uint8_t c;
-
   // Serial.print("SPI HAL write packet size: ");
   // Serial.println(len);
 
@@ -636,8 +656,6 @@ static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent) {
 // Handle sensor events.
 static void sensorHandler(void *cookie, sh2_SensorEvent_t *event) {
   int rc;
-  float t;
-  float r, i, j, k, acc_deg, x, y, z;
 
   // Serial.println("Got an event!");
 

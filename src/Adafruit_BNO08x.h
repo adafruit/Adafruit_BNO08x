@@ -64,28 +64,4 @@ protected:
       _HAL; ///< The struct representing the SH2 Hardware Abstraction Layer
 };
 
-static int i2chal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
-static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
-                       uint32_t *t_us);
-static void i2chal_close(sh2_Hal_t *self);
-static int i2chal_open(sh2_Hal_t *self);
-
-static int uarthal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
-static int uarthal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
-                        uint32_t *t_us);
-static void uarthal_close(sh2_Hal_t *self);
-static int uarthal_open(sh2_Hal_t *self);
-
-static bool spihal_wait_for_int(void);
-static int spihal_write(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len);
-static int spihal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
-                       uint32_t *t_us);
-static void spihal_close(sh2_Hal_t *self);
-static int spihal_open(sh2_Hal_t *self);
-
-static uint32_t hal_getTimeUs(sh2_Hal_t *self);
-static void hal_callback(void *cookie, sh2_AsyncEvent_t *pEvent);
-static void sensorHandler(void *cookie, sh2_SensorEvent_t *pEvent);
-static void hal_hardwareReset(void);
-
 #endif
