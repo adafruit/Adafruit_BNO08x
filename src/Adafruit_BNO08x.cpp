@@ -285,22 +285,18 @@ bool Adafruit_BNO08x::enableReport(sh2_SensorId_t sensorId,
 
 static int i2chal_open(sh2_Hal_t *self) {
   // Serial.println("I2C HAL open");
-
-  // send a software reset
   uint8_t softreset_pkt[] = {5, 0, 1, 0, 1};
-  // Serial.println("Sending softreset");
-  if (!i2c_dev->write(softreset_pkt, 5)) {
-    return -1;
+  bool success = false;
+  for (uint8_t attempts = 0; attempts < 5; attempts++) {
+    if (i2c_dev->write(softreset_pkt, 5)) {
+      success = true;
+      break;
+    }
+    delay(30);
   }
-  // Serial.println("OK!");
-  delay(100);
-
-  if (!i2c_dev->write(softreset_pkt, 5)) {
+  if (!success)
     return -1;
-  }
-  // Serial.println("OK!");
-  delay(100);
-
+  delay(300);
   return 0;
 }
 
