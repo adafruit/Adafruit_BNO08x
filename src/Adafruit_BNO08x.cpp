@@ -355,6 +355,14 @@ static int i2chal_read(sh2_Hal_t *self, uint8_t *pBuffer, unsigned len,
       return 0;
     }
 
+    // Drop invalid packet
+    uint16_t cargo_size;
+    cargo_size = (uint16_t)i2c_buffer[0] | (uint16_t)i2c_buffer[1] << 8;
+
+    if (cargo_size == 0) {
+      continue;
+    }
+
     if (first_read) {
       // The first time we're saving the "original" header, so include it in the
       // cargo count
