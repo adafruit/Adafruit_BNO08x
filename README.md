@@ -3,7 +3,7 @@
 
 This is the Adafruit BNO08x 9-DOF Orientation IMU Fusion Breakout for Arduino
 Tested and works great with the Adafruit BNO08x Breakout Board
-[<img src="assets/board.png?raw=true" width="500px">](https://www.adafruit.com/products/4754)
+[<img src="assets/board.jpg?raw=true" width="500px">](https://www.adafruit.com/products/4754)
 Adafruit invests time and resources providing this open source code, please support Adafruit and open-source hardware by purchasing products from Adafruit!
 
 # Installation
