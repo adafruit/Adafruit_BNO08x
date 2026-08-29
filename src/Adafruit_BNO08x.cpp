@@ -631,7 +631,13 @@ static void hal_hardwareReset(void) {
     digitalWrite(_reset_pin, LOW);
     delay(10);
     digitalWrite(_reset_pin, HIGH);
-    delay(10);
+    // BNO08X datasheet v1.17 §6.5.3 (Startup timing, Fig 6-8): t1
+    // (Internal Initialization) Min = 90 ms from NRST high, plus ~4 ms
+    // typ for t2 (Internal configuration), before the host may
+    // communicate. The previous 10 ms was 9x below spec; first SHTP
+    // packets to a not-yet-ready chip get dropped, leaving calibrated
+    // reports stuck at UNRELIABLE.
+    delay(100);
   }
 }
 
